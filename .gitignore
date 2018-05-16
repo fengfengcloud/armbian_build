@@ -8,6 +8,7 @@ ubuntu-*-cloudimg-console.log
 ### compile configurations added by users
 /config-*.conf
 ### but not default (supplied) files
+!/config-sunxi.conf
 !/config-docker.conf
 !/config-vagrant.conf
 
@@ -17,5 +18,8 @@ ubuntu-*-cloudimg-console.log
 /cache/
 /userpatches/
 
+!/userpatches/lib.config
+!/userpatches/overlay/democnc
+!/userpatches/customize-image.sh
 ### General annoyances ###
 .DS_Store
