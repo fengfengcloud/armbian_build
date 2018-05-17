@@ -83,17 +83,24 @@ InstallMachineKit() {
 }
 
 UserModify() {
+	# detect desktop
+	desktop_nodm=$(dpkg-query -W -f='${db:Status-Abbrev}\n' nodm 2>/dev/null)
+	desktop_lightdm=$(dpkg-query -W -f='${db:Status-Abbrev}\n' lightdm 2>/dev/null)
+
+	if [ -n "$desktop_nodm" ]; then DESKTOPDETECT="nodm"; fi
+	if [ -n "$desktop_lightdm" ]; then DESKTOPDETECT="lightdm"; fi
+### add user `cnc'
 	username=cnc
 	RealUserName="$(echo "$username" | tr '[:upper:]' '[:lower:]' | tr -d -c '[:alnum:]')"
 	[ -z "$RealUserName" ] && return
 	echo "Trying to add user $RealUserName"
-	useradd -U -m $RealUserName || return
+	useradd -U -m $RealUserName -s '/bin/bash' || return
 	for additionalgroup in sudo netdev audio video dialout plugdev bluetooth systemd-journal ssh; do
 		usermod -aG ${additionalgroup} ${RealUserName} 2>/dev/null
 	done
-	cp -rf /etc/skel* /home/$RealUserName
+#	cp -rf /etc/skel/* /home/$RealUserName
 	cp -rf /tmp/overlay/democnc/* /home/$RealUserName
-	if [ -d /home/$RealUserName/machinekit/configs ] ; then ln -sf /home/$RealUserName/machinekit/configs /home/$RealUserName/Desktop/configs fi
+	if [ -d /home/$RealUserName/machinekit/configs ] ; then ln -sf /home/$RealUserName/machinekit/configs /home/$RealUserName/Desktop/configs; fi
 	chown -R $RealUserName:$RealUserName /home/$RealUserName
 	# fix for gksu in Xenial
 	touch /home/$RealUserName/.Xauthority
@@ -112,6 +119,58 @@ UserModify() {
 	fi
 	echo root:${BOARD} | chpasswd
 	echo cnc:cnc | chpasswd
+
+	# check for H3/legacy kernel to promote h3disp utility
+	if [ -f /boot/script.bin ]; then tmp=$(bin2fex </boot/script.bin 2>/dev/null | grep -w "hdmi_used = 1"); fi
+	if [ "$LINUXFAMILY" = "sun8i" ] && [ "$BRANCH" = "default" ] && [ -n "$tmp" ]; then
+		setterm -default
+		echo -e "\nYour display settings are currently 720p (1280x720). To change this use the"
+		echo -e "h3disp utility. Do you want to change display settings now? [nY] \c"
+		read -n1 ConfigureDisplay
+		if [ "$ConfigureDisplay" != "n" ] && [ "$ConfigureDisplay" != "N" ]; then
+			echo -e "\n" ; h3disp
+		else
+			echo -e "\n"
+		fi
+	fi
+	# check whether desktop environment has to be considered
+	if [ "$DESKTOPDETECT" = nodm ] && [ -n "$RealName" ] ; then
+		# enable splash
+		# [[ -f /etc/systemd/system/desktop-splash.service ]] && systemctl --no-reload enable desktop-splash.service >/dev/null 2>&1 && service desktop-splash restart
+		sed -i "s/NODM_USER=\(.*\)/NODM_USER=${RealUserName}/" /etc/default/nodm
+		sed -i "s/NODM_ENABLED=\(.*\)/NODM_ENABLED=true/g" /etc/default/nodm
+		if [[ -f /var/run/resize2fs-reboot ]]; then
+			# Let the user reboot now otherwise start desktop environment
+			printf "\n\n\e[0;91mWarning: a reboot is needed to finish resizing the filesystem \x1B[0m \n"
+			printf "\e[0;91mPlease reboot the system now \x1B[0m \n\n"
+		elif [ -z "$ConfigureDisplay" ] || [ "$ConfigureDisplay" = "n" ] || [ "$ConfigureDisplay" = "N" ]; then
+			echo -e "\n\e[1m\e[39mNow starting desktop environment...\x1B[0m\n"
+			sleep 3
+			service nodm stop
+			sleep 1
+			service nodm start
+		fi
+	elif [ "$DESKTOPDETECT" = lightdm ] && [ -n "$RealName" ] ; then
+			ln -sf /lib/systemd/system/lightdm.service /etc/systemd/system/display-manager.service
+		if [[ -f /var/run/resize2fs-reboot ]]; then
+			# Let the user reboot now otherwise start desktop environment
+			printf "\n\n\e[0;91mWarning: a reboot is needed to finish resizing the filesystem \x1B[0m \n"
+			printf "\e[0;91mPlease reboot the system now \x1B[0m \n\n"
+		elif [ -z "$ConfigureDisplay" ] || [ "$ConfigureDisplay" = "n" ] || [ "$ConfigureDisplay" = "N" ]; then
+			echo -e "\n\e[1m\e[39mNow starting desktop environment...\x1B[0m\n"
+			sleep 1
+			service lightdm start 2>/dev/null
+			# logout if logged at console
+			[[ -n $(who -la | grep root | grep tty1) ]] && exit 1
+		fi
+	else
+		# Display reboot recommendation if necessary
+		if [[ -f /var/run/resize2fs-reboot ]]; then
+			printf "\n\n\e[0;91mWarning: a reboot is needed to finish resizing the filesystem \x1B[0m \n"
+			printf "\e[0;91mPlease reboot the system now \x1B[0m \n\n"
+		fi
+	fi
+# fi
 	rm -f /root/.not_logged_in_yet
 }
 
