@@ -1,0 +1,118 @@
+#!/bin/bash
+
+# arguments: $RELEASE $LINUXFAMILY $BOARD $BUILD_DESKTOP
+#
+# This is the image customization script
+
+# NOTE: It is copied to /tmp directory inside the image
+# and executed there inside chroot environment
+# so don't reference any files that are not already installed
+
+# NOTE: If you want to transfer files between chroot and host
+# userpatches/overlay directory on host is bind-mounted to /tmp/overlay in chroot
+
+RELEASE=$1
+LINUXFAMILY=$2
+BOARD=$3
+BUILD_DESKTOP=$4
+
+Main() {
+	case $RELEASE in
+		jessie)
+			# your code here
+			UserModify
+			InstallMachineKit
+			;;
+		xenial)
+			# your code here
+			UserModify
+			InstallMachineKit
+			;;
+		stretch)
+			# your code here
+			UserModify
+			InstallMachineKit
+			;;
+		bionic)
+			# your code here
+			;;
+	esac
+} # Main
+
+InstallMachineKit() {
+	export LANG=C
+# LC_ALL="en_US.UTF-8"
+
+	mount --bind /dev/null /proc/mdstat
+
+	case ${RELEASE} in
+		jessie)
+
+			apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 43DDF224
+			sh -c "echo 'deb http://deb.machinekit.io/debian jessie main' > /etc/apt/sources.list.d/machinekit.list"
+			apt-get update
+			apt-get --yes --force-yes install machinekit-rt-preempt
+			;;
+		stretch)
+
+			apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 43DDF224
+			sh -c "echo 'deb http://deb.machinekit.io/debian stretch main' > /etc/apt/sources.list.d/machinekit.list"
+			apt-get update
+			apt-get --yes install machinekit-rt-preempt
+			;;
+
+		xenial)
+#			add-apt-repository ppa:1pt1nq88tvxvjiijcixknc4iaqh3-na9c-8aho930n7szvk8tyqp2yd0cny5gr/mk
+#			apt-get update
+#
+#	cat > /etc/apt/sources.list.d/machinekit.list <<- EOF
+#	deb http://ppa.launchpad.net/1pt1nq88tvxvjiijcixknc4iaqh3-na9c-8aho930n7szvk8tyqp2yd0cny5gr/mk/ubuntu xenial main 
+#	deb-src http://ppa.launchpad.net/1pt1nq88tvxvjiijcixknc4iaqh3-na9c-8aho930n7szvk8tyqp2yd0cny5gr/mk/ubuntu xenial main 
+#	EOF
+			apt-get update
+#			apt-get install machinekit-rt-preempt
+#
+			apt-get remove xrdp vnc4server tightvncserver
+			apt-get install tightvncserver
+			apt-get install xrdp
+			;;
+	esac
+#	# clean up and force password change on first boot
+	umount /proc/mdstat
+	chage -d 0 root
+}
+
+UserModify() {
+	username=cnc
+	RealUserName="$(echo "$username" | tr '[:upper:]' '[:lower:]' | tr -d -c '[:alnum:]')"
+	[ -z "$RealUserName" ] && return
+	echo "Trying to add user $RealUserName"
+	useradd -U -m $RealUserName || return
+	for additionalgroup in sudo netdev audio video dialout plugdev bluetooth systemd-journal ssh; do
+		usermod -aG ${additionalgroup} ${RealUserName} 2>/dev/null
+	done
+	cp -rf /etc/skel* /home/$RealUserName
+	cp -rf /tmp/overlay/democnc/* /home/$RealUserName
+	if [ -d /home/$RealUserName/machinekit/configs ] ; then ln -sf /home/$RealUserName/machinekit/configs /home/$RealUserName/Desktop/configs fi
+	chown -R $RealUserName:$RealUserName /home/$RealUserName
+	# fix for gksu in Xenial
+	touch /home/$RealUserName/.Xauthority
+	chown $RealUserName:$RealUserName /home/$RealUserName/.Xauthority
+	RealName="$(awk -F":" "/^${RealUserName}:/ {print \$5}" </etc/passwd | cut -d',' -f1)"
+	[ -z "$RealName" ] && RealName=$RealUserName
+	echo -e "\nDear ${RealName}, your account ${RealUserName} has been created and is sudo enabled."
+	echo -e "Please use this account for your daily work from now on.\n"
+#	rm -f /root/.not_logged_in_yet
+	# set up profile sync daemon on desktop systems
+	which psd >/dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		echo -e "${RealUserName} ALL=(ALL) NOPASSWD: /usr/bin/psd-overlay-helper" >> /etc/sudoers
+		touch /home/${RealUserName}/.activate_psd
+		chown $RealUserName:$RealUserName /home/${RealUserName}/.activate_psd
+	fi
+	echo root:${BOARD} | chpasswd
+	echo cnc:cnc | chpasswd
+	rm -f /root/.not_logged_in_yet
+}
+
+Main "$@"
