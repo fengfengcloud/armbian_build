@@ -22,19 +22,25 @@ Main() {
 			# your code here
 			UserModify
 			InstallMachineKit
+			CheckCPUFreq
 			;;
 		xenial)
 			# your code here
 			UserModify
 			InstallMachineKit
+			CheckCPUFreq
 			;;
 		stretch)
 			# your code here
 			UserModify
 			InstallMachineKit
+			CheckCPUFreq
 			;;
 		bionic)
 			# your code here
+			UserModify
+			#InstallMachineKit
+			CheckCPUFreq
 			;;
 	esac
 } # Main
@@ -172,6 +178,10 @@ UserModify() {
 	fi
 # fi
 	rm -f /root/.not_logged_in_yet
+}
+
+CheckCPUFreq(){
+    [[ -f /lib/systemd/system/ondemand.service ]] && systemctl disable ondemand
 }
 
 Main "$@"
