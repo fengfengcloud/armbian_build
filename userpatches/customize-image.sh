@@ -43,12 +43,16 @@ Main() {
 			CheckCPUFreq
 			;;
 	esac
+	case $BOARD in
+	    orangepipc|orangepione)
+			InstallARiscFW_H3
+			;;
+	esac
 } # Main
 
 InstallMachineKit() {
-	export LANG=C
+	export LANG=C LC_ALL=C
 # LC_ALL="en_US.UTF-8"
-
 	mount --bind /dev/null /proc/mdstat
 
 	case ${RELEASE} in
@@ -68,19 +72,8 @@ InstallMachineKit() {
 			;;
 
 		xenial)
-#			add-apt-repository ppa:1pt1nq88tvxvjiijcixknc4iaqh3-na9c-8aho930n7szvk8tyqp2yd0cny5gr/mk
-#			apt-get update
-#
-#	cat > /etc/apt/sources.list.d/machinekit.list <<- EOF
-#	deb http://ppa.launchpad.net/1pt1nq88tvxvjiijcixknc4iaqh3-na9c-8aho930n7szvk8tyqp2yd0cny5gr/mk/ubuntu xenial main 
-#	deb-src http://ppa.launchpad.net/1pt1nq88tvxvjiijcixknc4iaqh3-na9c-8aho930n7szvk8tyqp2yd0cny5gr/mk/ubuntu xenial main 
-#	EOF
-			apt-get update
-#			apt-get install machinekit-rt-preempt
-#
-			apt-get remove xrdp vnc4server tightvncserver
-			apt-get install tightvncserver
-			apt-get install xrdp
+			;;
+		bionic)
 			;;
 	esac
 #	# clean up and force password change on first boot
@@ -182,6 +175,10 @@ UserModify() {
 
 CheckCPUFreq(){
     [[ -f /lib/systemd/system/ondemand.service ]] && systemctl disable ondemand
+}
+
+InstallARiscFW_H3(){
+	cp -rf /tmp/overlay/h3_arisc_fw/* /boot
 }
 
 Main "$@"
