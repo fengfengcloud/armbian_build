@@ -7,9 +7,5 @@ MODULES_NEXT=""
 OVERLAY_PREFIX=""
 #
 KERNEL_TARGET="next,dev"
-CLI_TARGET=""
-DESKTOP_TARGET=""
-#
-BOARDRATING=""
-HARDWARE="https://linux-sunxi.org/Banana_Pi_M2_Ultra"
-FORUMS="http://forum.armbian.com/index.php/forum/11-other-boards/"
+CLI_TARGET="stretch:next,dev"
+DESKTOP_TARGET="bionic:next,dev"
